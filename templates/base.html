@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Gestión solicitudes de Mantenimiento{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+    {% if session.get('user_id') %}
+    <nav class="navbar">
+        
+        <!-- LOGO -->
+        <div class="navbar-top">
+            <a href="{{ url_for('reports.dashboard') }}" class="navbar-brand">
+                <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo"
+                    onerror="this.style.display='none';">
+                <span>SOL/MTTO</span>
+            </a>
+
+            <!-- BOTÓN HAMBURGUESA -->
+            <button class="menu-toggle" onclick="toggleMenu()">☰</button>
+        </div>
+
+        <!-- MENÚ -->
+        <div class="nav-links" id="navMenu">
+            <span class="nav-link role-text">
+                Rol: <strong>{{ session.get('role') }}</strong>
+            </span>
+
+            <a href="{{ url_for('reports.dashboard') }}" class="nav-link">Inicio</a>
+
+            {% if session.get('role') == 'ADMIN' %}
+            <a href="{{ url_for('auth.users') }}" class="nav-link">Usuarios</a>
+            {% endif %}
+
+            {% if session.get('role') in ['ADMIN', 'COMPRAS'] %}
+            <a href="{{ url_for('suppliers.suppliers') }}" class="nav-link">Proveedores</a>
+            {% endif %}
+
+            {% if session.get('role') not in ['GT', 'GR'] %}
+            <a href="{{ url_for('products.products') }}" class="nav-link">Productos</a>
+            <a href="{{ url_for('maintenance.maintenance_list') }}" class="nav-link">Historial</a>
+            {% endif %}
+
+            {% if session.get('role') in ['ADMIN'] %}
+            <a href="{{ url_for('reports.reports') }}" class="nav-link">Reportes</a>
+            {% endif %}
+
+            {% if session.get('role') in ['ADMIN', 'ALMACEN'] %}
+            <a href="{{ url_for('maintenance.maintenance') }}" class="nav-link">Nuevo Registro</a>
+            {% endif %}
+
+            <a href="{{ url_for('maintenance.items_dashboard') }}" class="nav-link highlight">
+                ✔ Bandeja ERP
+            </a>
+
+            <a href="{{ url_for('auth.logout') }}" class="btn btn-danger logout-btn">
+                Salir
+            </a>
+        </div>
+    </nav>
+    {% endif %}
+
+    <main class="main-content">
+        <div class="alerts-container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+        </div>
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- SCRIPT MENÚ -->
+    <script>
+        function toggleMenu() {
+            const menu = document.getElementById('navMenu');
+            menu.classList.toggle('active');
+        }
+    </script>
+    <script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    document.querySelectorAll("form").forEach(form => {
+
+        form.addEventListener("submit", function (e) {
+
+            // Solo para botones importantes
+            const btn = document.activeElement;
+
+            if (!btn) return;
+
+            const text = btn.innerText.toLowerCase();
+
+            // 🔥 Detectar acciones críticas
+            if (text.includes("eliminar") || text.includes("borrar")) {
+                if (!confirm("⚠️ ¿Seguro que deseas eliminar este registro?")) {
+                    e.preventDefault();
+                }
+            }
+
+            if (text.includes("guardar") || text.includes("grabar")) {
+                if (!confirm("¿Deseas verificar y guardar la información?")) {
+                    e.preventDefault();
+                }
+            }
+
+            if (text.includes("aprobar")) {
+                if (!confirm("¿Confirmas la aprobación?")) {
+                    e.preventDefault();
+                }
+            }
+
+            if (text.includes("rechazar")) {
+                if (!confirm("¿Confirmas el rechazo?")) {
+                    e.preventDefault();
+                }
+            }
+
+        });
+
+    });
+
+});
+</script>
+<script>
+document.addEventListener("submit", function(e) {
+    const btn = e.submitter;
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = "Procesando...";
+    }
+});
+</script>
+</body>
+
+</html>

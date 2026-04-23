@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% block title %}Gestión de Usuarios{% endblock %}
+
+{% block content %}
+<div class="glass-panel">
+    <h2>Gestión de Usuarios</h2>
+    <p>Administra los usuarios del sistema y sus roles correspondientes.</p>
+
+    <!-- Create User Form -->
+    <div style="background: var(--surface-color); padding: 1.5rem; border-radius: 8px; margin-top: 1.5rem; border: 1px solid var(--border-color);">
+        <h4 style="margin-top: 0; margin-bottom: 1rem;">Nuevo Usuario</h4>
+
+        <form method="POST" action="{{ url_for('auth.users') }}" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+            <input type="hidden" name="action" value="CREATE">
+
+            <div class="form-group" style="margin-bottom: 0;">
+                <label>Nombre de Usuario</label>
+                <input type="text" name="username" class="form-control" required style="width: 200px;">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+                <label>Contraseña</label>
+                <input type="password" name="password" class="form-control" required style="width: 200px;" autocomplete="new-password">
+            </div>
+
+            <!-- 🔥 NUEVO EMAIL -->
+            <div class="form-group" style="margin-bottom: 0;">
+                <label>Email</label>
+                <input type="email" name="email" class="form-control" required style="width: 250px;">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+                <label>Rol</label>
+                <select name="role" class="form-control" required style="width: 200px;">
+                    <option value="">Seleccione rol...</option>
+                    {% for r in roles %}
+                    <option value="{{ r }}">{{ r }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="margin-bottom: 0.15rem; padding: 0.7rem 1.2rem;">
+                Crear Usuario
+            </button>
+        </form>
+
+        <p style="font-size: 0.8rem; margin-top: 0.5rem; color: var(--text-muted);">
+            El rol determinará a qué funcionalidades y flujos de trazabilidad tendrá acceso el usuario.
+        </p>
+    </div>
+
+    <!-- Additional Tools -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem;">
+
+        <!-- CSV -->
+        <div style="background: var(--surface-color); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <h4 style="margin-top: 0; margin-bottom: 1rem;">Carga Masiva (CSV)</h4>
+
+            <form method="POST" action="{{ url_for('auth.users') }}" enctype="multipart/form-data" style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="hidden" name="action" value="UPLOAD_CSV">
+                <input type="file" name="file" accept=".csv" class="form-control" required style="padding: 0.5rem;">
+                <button type="submit" class="btn btn-primary">Subir</button>
+            </form>
+        </div>
+
+        {% if session.get('role') == 'ADMIN' %}
+        <!-- LOGO -->
+        <div style="background: var(--surface-color); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <h4 style="margin-top: 0; margin-bottom: 1rem;">Actualizar Logo</h4>
+
+            <form method="POST" action="{{ url_for('reports.upload_logo') }}" enctype="multipart/form-data" style="display: flex; gap: 0.5rem;">
+                <input type="file" name="logo" accept="image/*" class="form-control" required>
+                <button type="submit" class="btn btn-primary">Actualizar</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- USERS TABLE -->
+    <div class="table-wrapper" style="margin-top: 2rem;">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Usuario</th>
+                    <th>Email</th> <!-- 🔥 NUEVO -->
+                    <th>Rol</th>
+                    <th>Cambiar Rol</th>
+                    <th style="text-align: center;">Eliminar</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td>{{ u.id }}</td>
+
+                    <td><strong>{{ u.username }}</strong></td>
+
+                    <!-- 🔥 EMAIL -->
+                    <td>{{ u.email or '-' }}</td>
+
+                    <td>
+                        <span style="font-size: 0.8rem; padding: 0.2rem 0.5rem; border-radius: 12px; background: #e0f2fe; color: #0369a1; font-weight: bold;">
+                            {{ u.role }}
+                        </span>
+                    </td>
+
+                    <td>
+                        <form method="POST" action="{{ url_for('auth.users') }}" style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="hidden" name="action" value="UPDATE_ROLE">
+                            <input type="hidden" name="user_id" value="{{ u.id }}">
+
+                            <!-- Modificación de email directamente en la tabla -->
+                            <input type="email" name="email" value="{{ u.email or '' }}" class="form-control" style="width: 150px; padding: 0.3rem;" placeholder="Nuevo correo">
+
+                            <select name="role" class="form-control" style="width: auto;">
+                                {% for r in roles %}
+                                <option value="{{ r }}" {% if r == u.role %}selected{% endif %}>
+                                    {{ r }}
+                                </option>
+                                {% endfor %}
+                            </select>
+
+                            <button type="submit" class="btn" style="background: #f59e0b; color: white; padding: 0.3rem 0.8rem;">
+                                Actualizar
+                            </button>
+                        </form>
+                    </td>
+
+                    <td style="text-align: center;">
+                        <form method="POST" action="{{ url_for('auth.users') }}"
+                              onsubmit="return confirm('¿Eliminar usuario?');">
+
+                            <input type="hidden" name="action" value="DELETE">
+                            <input type="hidden" name="user_id" value="{{ u.id }}">
+
+                            {% if u.id != session.get('user_id') %}
+                            <button type="submit" class="btn btn-danger">Eliminar</button>
+                            {% else %}
+                            <button disabled class="btn">(Actual)</button>
+                            {% endif %}
+                        </form>
+                    </td>
+                </tr>
+
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 2rem;">
+                        No hay usuarios registrados.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block title %}Historial de Registros{% endblock %}
+{% block content %}
+<div class="glass-panel">
+    <h2>Historial de Solicitudes</h2>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Num. Consecutivo</th>
+                    <th>Fecha</th>
+                    <th>Solicitado por</th>
+                    <th>Destino/Uso</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in records %}
+                <tr>
+                    <td><strong>#{{ r.consecutive_no }}</strong></td>
+                    <td>{{ r.date }}</td>
+                    <td>{{ r.requested_by }}</td>
+                    <td>{{ r.destination }}</td>
+                    <td>
+                        <div style="display:flex; gap: 0.5rem;">
+                            <!-- Botón para ver los ítems de este registro en la bandeja -->
+                            <a href="{{ url_for('maintenance.items_dashboard', ref=r.consecutive_no) }}" class="btn btn-primary"
+                                style="padding: 0.2rem 0.6rem; font-size: 0.8rem; background: #6b7280;">
+                                Ver Ítems
+                            </a>
+                            <!-- Opción Modificar/Eliminar solo para quienes crearon -->
+                            {% if session.get('role') in ['ADMIN', 'WRITE'] %}
+                            <form method="POST" action="{{ url_for('maintenance.delete_maintenance', rec_id=r.id) }}"
+                                onsubmit="var obs = prompt('Motivo de anulación (Obligatorio):'); if (!obs) { alert('Debe ingresar un motivo para anular.'); return false; } this.observation.value = obs; return true;">
+                                <input type="hidden" name="observation" value="">
+                                <button type="submit" class="btn btn-danger"
+                                    style="padding: 0.2rem 0.6rem; font-size: 0.8rem; background: #991b1b;">Anular</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center;">No hay registros de mantenimiento.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

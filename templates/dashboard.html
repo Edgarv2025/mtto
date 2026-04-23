@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Inicio{% endblock %}
+{% block content %}
+<div class="glass-panel" style="text-align: center; padding: 4rem 2rem;">
+    <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo" style="width: 100px;">
+    <h1 style="font-size: 2.5rem; color: var(--primary-color);">Bienvenido, {{ session.get('username')|capitalize }}
+    </h1>
+    <p style="font-size: 1.1rem; max-width: 600px; margin: 0 auto 2rem auto;">
+        Has ingresado exitosamente al Sistema de solicitudes de Mantenimiento.
+        Tu rol actual es <strong>{{ session.get('role') }}</strong>.
+    </p>
+
+    <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+        <a href="{{ url_for('products.products') }}" class="btn btn-primary" style="background:#4b5563;">📦 Ver Catálogo</a>
+
+        {% if session.get('role') in ['ADMIN', 'WRITE'] %}
+        <a href="{{ url_for('maintenance.maintenance') }}" class="btn btn-primary">📝 Nuevo Registro</a>
+        {% endif %}
+
+        {% if session.get('role') in ['ADMIN', 'READ'] %}
+        <a href="{{ url_for('maintenance.maintenance_list') }}" class="btn btn-primary" style="background:#10b981;">📋 Ver
+            Historiales</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% block title %}Reportes Estadísticos{% endblock %}
+{% block content %}
+<div class="glass-panel">
+    <h2>Reportes Estadísticos</h2>
+    <p>Métricas históricas y actuales generadas a través del ciclo de vida del mantenimiento.</p>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+        
+        <!-- Chart 1: Distribución de Estados -->
+        <div style="background: var(--surface-color); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <h4 style="margin-top: 0; text-align: center;">Distribución de Estados</h4>
+            <div style="position: relative; height: 300px;">
+                <canvas id="statusChart"></canvas>
+            </div>
+            <p style="text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 1rem;">Total de ítems registrados por fase de trazabilidad.</p>
+        </div>
+
+        <!-- Chart 2: Métricas por Prioridad -->
+        <div style="background: var(--surface-color); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <h4 style="margin-top: 0; text-align: center;">Volumen Histórico por Prioridad</h4>
+            <div style="position: relative; height: 300px;">
+                <canvas id="priorityChart"></canvas>
+            </div>
+            <p style="text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 1rem;">Cantidad de solicitudes ingresadas categorizadas por peso de prioridad.</p>
+        </div>
+
+        <!-- Chart 3: Costos Acumulados por Código -->
+        <div style="background: var(--surface-color); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <h4 style="margin-top: 0; text-align: center;">Top 10: Gasto por Producto</h4>
+            <div style="position: relative; height: 350px;">
+                <canvas id="costChart"></canvas>
+            </div>
+            <p style="text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 1rem;">Métrica del gasto acumulado de compras aprobadas, agrupado por producto (usa costo de proveedor seleccionado).</p>
+        </div>
+
+        <!-- Chart 4: Costos Acumulados por Destino -->
+        <div style="background: var(--surface-color); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <h4 style="margin-top: 0; text-align: center;">Top 10: Gasto por Departamento / Destino</h4>
+            <div style="position: relative; height: 350px;">
+                <canvas id="destChart"></canvas>
+            </div>
+            <p style="text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 1rem;">Métrica del gasto acumulado distribuido por centro de costos o área de destino en los requerimientos.</p>
+        </div>
+
+    </div>
+</div>
+
+<!-- Cargar Chart.js mediante CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Data inyectada desde Flask
+        const statusDataRaw = {{ status_data | tojson | safe }};
+        const priorityDataRaw = {{ priority_data | tojson | safe }};
+        const costDataRaw = {{ cost_data | tojson | safe }};
+        const destCostDataRaw = {{ dest_cost_data | tojson | safe }};
+
+        // --- Gráfico de Dona: Distribución de Estados ---
+        const sLabels = statusDataRaw.map(d => d.status);
+        const sData = statusDataRaw.map(d => d.count);
+        new Chart(document.getElementById('statusChart'), {
+            type: 'doughnut',
+            data: {
+                labels: sLabels,
+                datasets: [{
+                    data: sData,
+                    backgroundColor: [
+                        '#3b82f6', '#f59e0b', '#10b981', '#6366f1', '#ec4899', '#ef4444', '#8b5cf6', '#14b8a6'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+        });
+
+        // --- Gráfico de Barras: Prioridad ---
+        const pLabels = priorityDataRaw.map(d => d.priority);
+        const pData = priorityDataRaw.map(d => d.count);
+        new Chart(document.getElementById('priorityChart'), {
+            type: 'bar',
+            data: {
+                labels: pLabels,
+                datasets: [{
+                    label: 'Cantidad de Ítems',
+                    data: pData,
+                    backgroundColor: '#8b5cf6',
+                    borderRadius: 4
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        // --- Gráfico de Barras: Historial Costos por Producto ---
+        const cLabels = costDataRaw.map(d => d.product_code);
+        const cData = costDataRaw.map(d => d.total_cost);
+        new Chart(document.getElementById('costChart'), {
+            type: 'bar',
+            data: {
+                labels: cLabels,
+                datasets: [{
+                    label: 'Gasto Acumulado ($)',
+                    data: cData,
+                    backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                    borderColor: '#10b981',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+
+        // --- Gráfico de Barras: Historial Costos por Destino ---
+        const dLabels = destCostDataRaw.map(d => d.destination);
+        const dData = destCostDataRaw.map(d => d.total_cost);
+        new Chart(document.getElementById('destChart'), {
+            type: 'bar',
+            data: {
+                labels: dLabels,
+                datasets: [{
+                    label: 'Gasto Acumulado por Área ($)',
+                    data: dData,
+                    backgroundColor: 'rgba(236, 72, 153, 0.8)',
+                    borderColor: '#ec4899',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

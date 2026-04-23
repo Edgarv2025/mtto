@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% block title %}Productos{% endblock %}
+
+{% block content %}
+<div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+
+    <div style="flex: 1; min-width: 300px;">
+
+        <div class="glass-panel" style="margin-bottom: 2rem;">
+            <h2>Catálogo de Productos</h2>
+
+            <!-- 🔍 BUSCADOR -->
+            <form method="GET" style="margin-bottom: 1rem; display: flex; gap: 0.5rem;">
+                <input type="text" name="search" placeholder="Buscar por descripción..." value="{{ search or '' }}"
+                    class="form-control" style="padding: 0.4rem;">
+                <button type="submit" class="btn btn-primary" style="padding: 0.4rem 0.8rem;">
+                    Buscar
+                </button>
+                <a href="{{ url_for('products.products') }}" class="btn" style="padding: 0.4rem 0.8rem;">
+                    Limpiar
+                </a>
+            </form>
+
+            <div class="table-wrapper responsive-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Descripción</th>
+                            <th>Unidad</th>
+                            {% if session.get('role') in ['ADMIN', 'ALMACEN'] %}
+                            <th>Acciones</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for p in products %}
+                        <form id="form_{{ loop.index }}" method="POST" action="{{ url_for('products.products') }}"></form>
+                        <tr>
+                            <td>
+                                {{ p.code }}
+                                <input type="hidden" name="code" value="{{ p.code }}" form="form_{{ loop.index }}">
+                            </td>
+
+                            <td>
+                                {% if session.get('role') in ['ADMIN', 'ALMACEN'] %}
+                                <input type="text" name="description" value="{{ p.description }}" form="form_{{ loop.index }}"
+                                    class="form-control">
+                                {% else %}
+                                {{ p.description }}
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if session.get('role') in ['ADMIN', 'ALMACEN'] %}
+                                <input type="text" name="unit_of_measure" value="{{ p.unit_of_measure }}" form="form_{{ loop.index }}"
+                                    class="form-control">
+                                {% else %}
+                                {{ p.unit_of_measure }}
+                                {% endif %}
+                            </td>
+
+                            {% if session.get('role') in ['ADMIN', 'ALMACEN'] %}
+                            <td style="display:flex; gap:0.3rem;">
+                                <input type="hidden" name="action" id="action_prod_{{ loop.index }}" value="" form="form_{{ loop.index }}">
+                                <button type="button" onclick="document.getElementById('action_prod_{{ loop.index }}').value='UPDATE'; document.getElementById('form_{{ loop.index }}').submit();" class="btn btn-primary">
+                                    💾
+                                </button>
+
+                                <button type="button" onclick="if(confirm('¿Seguro que deseas eliminar este producto?')) { document.getElementById('action_prod_{{ loop.index }}').value='DELETE'; document.getElementById('form_{{ loop.index }}').submit(); }" class="btn btn-danger">
+                                    🗑
+                                </button>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" style="text-align: center;">
+                                No hay productos registrados.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% if session.get('role') in ['ADMIN', 'ALMACEN'] %}
+    <div style="flex: 0 0 350px;">
+
+        <div class="glass-panel" style="margin-bottom: 2rem;">
+            <h3>Importar CSV Massive</h3>
+            <p style="font-size: 0.85rem;">
+                Archivo CSV. Columnas: Código, Descripción, Unidad.
+            </p>
+
+            <form action="{{ url_for('products.upload_csv') }}" method="POST" enctype="multipart/form-data"
+                class="file-upload-wrapper">
+                <input type="file" name="csv_file" accept=".csv" required>
+                <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1rem;">
+                    Subir
+                </button>
+            </form>
+        </div>
+
+        <div class="glass-panel">
+            <h3>Agregar Manualmente</h3>
+
+            <form method="POST">
+                <input type="hidden" name="action" value="CREATE">
+
+                <div class="form-group">
+                    <label class="form-label">Código</label>
+                    <input type="text" name="code" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Descripción</label>
+                    <input type="text" name="description" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Unidad de Medida</label>
+                    <input type="text" name="unit_of_measure" class="form-control" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    Guardar Producto
+                </button>
+
+            </form>
+        </div>
+
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

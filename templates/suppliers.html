@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% block title %}Catálogo de Proveedores{% endblock %}
+
+{% block content %}
+<div class="glass-panel">
+    <h2>Catálogo de Proveedores</h2>
+    <p>Agrega o consulta los proveedores disponibles para el área de adquisiciones.</p>
+
+    {% if session.get('role') in ['ADMIN', 'COMPRAS'] %}
+    <!-- 🔹 FORM CREAR -->
+    <form method="POST" style="margin: 1.5rem 0;" class="form-group">
+        <input type="hidden" name="action" value="CREATE">
+        <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+            
+            <div>
+                <label class="form-label">NIT / RUC</label>
+                <input type="text" name="nit" class="form-control" placeholder="Ej. 900123456-1" required>
+            </div>
+
+            <div>
+                <label class="form-label">Razón Social</label>
+                <input type="text" name="name" class="form-control" placeholder="Razon social" required>
+            </div>
+
+            <div>
+                <label class="form-label">Contacto</label>
+                <input type="text" name="contact_name" class="form-control" placeholder="Nombre y apellido">
+            </div>
+
+            <div>
+                <label class="form-label">Teléfono</label>
+                <input type="text" name="phone" class="form-control" placeholder="Celular">
+            </div>
+
+            <div>
+                <button type="submit" class="btn btn-primary">Agregar</button>
+            </div>
+        </div>
+    </form>
+
+    <!-- 🔹 CSV -->
+    <div style="background: var(--surface-color); padding: 1.2rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 1.5rem;">
+        <h4 style="margin-top: 0;">Subida Masiva (CSV)</h4>
+        <form method="POST" enctype="multipart/form-data" style="display: flex; gap: 0.5rem;">
+            <input type="hidden" name="action" value="UPLOAD_CSV">
+            <input type="file" name="file" accept=".csv" class="form-control" required>
+            <button type="submit" class="btn btn-primary">Importar</button>
+        </form>
+        <small>Formato: NIT, Nombre, Contacto, Teléfono</small>
+    </div>
+    {% endif %}
+
+    <!-- 🔹 TABLA -->
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>NIT</th>
+                    <th>Razón Social</th>
+                    <th>Contacto</th>
+                    <th>Teléfono</th>
+                    {% if session.get('role') in ['ADMIN', 'COMPRAS'] %}
+                    <th>Acciones</th>
+                    {% endif %}
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for p in suppliers %}
+                <form id="form_edit_{{ p.id }}" method="POST" action="{{ url_for('suppliers.suppliers') }}">
+                    <input type="hidden" name="action" value="EDIT">
+                    <input type="hidden" name="id" value="{{ p.id }}">
+                </form>
+                <form id="form_del_{{ p.id }}" method="POST" action="{{ url_for('suppliers.suppliers') }}" onsubmit="return confirm('¿Eliminar proveedor?');">
+                    <input type="hidden" name="action" value="DELETE">
+                    <input type="hidden" name="id" value="{{ p.id }}">
+                </form>
+
+                <tr>
+                        <td><strong>{{ p.nit }}</strong></td>
+
+                        <td>
+                            {% if session.get('role') in ['ADMIN', 'COMPRAS'] %}
+                                <input type="text" name="name" value="{{ p.name }}" class="form-control" form="form_edit_{{ p.id }}">
+                            {% else %}
+                                {{ p.name }}
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if session.get('role') in ['ADMIN', 'COMPRAS'] %}
+                                <input type="text" name="contact_name" value="{{ p.contact_name }}" class="form-control" form="form_edit_{{ p.id }}">
+                            {% else %}
+                                {{ p.contact_name }}
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if session.get('role') in ['ADMIN', 'COMPRAS'] %}
+                                <input type="text" name="phone" value="{{ p.phone }}" class="form-control" form="form_edit_{{ p.id }}">
+                            {% else %}
+                                {{ p.phone }}
+                            {% endif %}
+                        </td>
+
+                        {% if session.get('role') in ['ADMIN', 'COMPRAS'] %}
+                        <td style="display: flex; flex-direction: column; gap: 0.3rem;">
+                            <button type="submit" class="btn btn-success" style="font-size: 0.8rem;" form="form_edit_{{ p.id }}">
+                                Guardar
+                            </button>
+                            <button type="submit" class="btn btn-danger" style="font-size: 0.8rem;" form="form_del_{{ p.id }}">
+                                Borrar
+                            </button>
+                        </td>
+                        {% endif %}
+                    </tr>
+                </tr>
+
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align:center;">
+                        No hay proveedores registrados.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

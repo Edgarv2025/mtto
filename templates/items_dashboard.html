@@ -1,0 +1,316 @@
+{% extends 'base.html' %}
+{% block title %}Flujo de Aprobaciones ERP{% endblock %}
+{% block content %}
+<div class="glass-panel">
+    <div id="update-toast"
+        style="display: none; background: #007bff; color: white; padding: 0.8rem; border-radius: 6px; margin-bottom: 1rem; cursor: pointer; text-align: center; font-weight: bold; animation: pulse 2s infinite;"
+        onclick="window.location.reload()">
+        🔔 Hay nuevos ítems o requerimientos actualizados por otros usuarios. ¡Haz clic aquí para refrescar la bandeja!
+    </div>
+    <datalist id="suppliers-list"></datalist>
+    <h2>Tablero de Trazabilidad por Ítems</h2>
+    <p>Visualiza y gestiona las piezas que requieren tu atención.</p>
+
+    <form method="GET" action="{{ url_for('maintenance.items_dashboard') }}"
+        style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin: 1.5rem 0; background: var(--surface-color); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; flex: 1;">
+            <button type="button" onclick="document.getElementById('statusSelect').value=''; this.form.submit();" class="btn"
+                style="padding: 0.3rem 0.8rem; border: 1px solid var(--border-color); background: {% if not current_filter %}var(--primary-color){% else %}#fff{% endif %}; color: {% if not current_filter %}white{% else %}var(--text-main){% endif %}; font-size: 0.85rem;">Todos
+                (Lectura)</button>
+
+            {% set states = [] %}
+            {% if session.get('role') == 'ADMIN' %}
+            {% set states = [('PENDIENTE_JEFE', 'Pendiente Jefe'), ('COTIZACION', 'Cotización'), ('PENDIENTE_GT',
+            'Pendiente GT'), ('PENDIENTE_GR', 'Gerencia'), ('COMPRA_EN_CURSO', 'Compra'), ('TRANSITO', 'Tránsito'),
+            ('RECIBIDO', 'Recibido'), ('RECHAZADO', 'Rechazado')] %}
+            {% elif session.get('role') == 'JEFE_AREA' %}
+            {% set states = [('PENDIENTE_JEFE', 'Pendiente Jefe')] %}
+            {% elif session.get('role') == 'GT' %}
+            {% set states = [('PENDIENTE_GT', 'Pendiente GT')] %}
+            {% elif session.get('role') == 'GR' %}
+            {% set states = [('PENDIENTE_GR', 'Gerencia')] %}
+            {% elif session.get('role') == 'COMPRAS' %}
+            {% set states = [('COTIZACION', 'Cotización'), ('COMPRA_EN_CURSO', 'Compra'), ('TRANSITO', 'Tránsito')] %}
+            {% elif session.get('role') == 'ALMACEN' %}
+            {% set states = [
+            ('TRANSITO', 'Tránsito'),
+            ('RECIBIDO', 'Recibido'),
+            ('RECHAZADO', 'Rechazado')
+            ] %}
+            {% else %}
+            {% set states = [('PENDIENTE_JEFE', 'Pendiente Jefe'), ('COTIZACION', 'Cotización'), ('PENDIENTE_GT',
+            'Pendiente GT'), ('PENDIENTE_GR', 'Gerencia'), ('COMPRA_EN_CURSO', 'Compra'), ('TRANSITO', 'Tránsito'),
+            ('RECIBIDO', 'Recibido'), ('RECHAZADO', 'Rechazado')] %}
+            {% endif %}
+
+            {% for state, label in states %}
+            <button type="button" onclick="document.getElementById('statusSelect').value='{{ state }}'; this.form.submit();" class="btn"
+                style="padding: 0.3rem 0.8rem; border: 1px solid var(--border-color); background: {% if current_filter == state %}var(--primary-color){% else %}#fff{% endif %}; color: {% if current_filter == state %}white{% else %}var(--text-main){% endif %}; font-size: 0.85rem;">{{
+                label }}</button>
+            {% endfor %}
+        </div>
+        <div
+            style="display: flex; align-items: center; gap: 0.5rem; border-left: 2px solid var(--border-color); padding-left: 1rem;">
+            <label style="font-size: 0.85rem; font-weight: bold; color: var(--text-muted);">Prioridad:</label>
+            <select name="priority" class="form-control" style="padding: 0.3rem; min-width: 120px;"
+                onchange="this.form.submit()">
+                <option value="">Todas</option>
+                <option value="Alta" {% if priority_filter=='Alta' %}selected{% endif %}>Alta</option>
+                <option value="Media" {% if priority_filter=='Media' %}selected{% endif %}>Media</option>
+                <option value="Baja" {% if priority_filter=='Baja' %}selected{% endif %}>Baja</option>
+            </select>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <label style="font-size: 0.85rem; font-weight: bold; color: var(--text-muted);">Estado:</label>
+                <select name="status" id="statusSelect" class="form-control" style="padding: 0.3rem; min-width: 150px;"
+                    onchange="this.form.submit()">
+                    <option value="">Todos</option>
+                    {% for state, label in states %}
+                    <option value="{{ state }}" {% if current_filter==state %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </form>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Estado</th>
+                    <th>Ref#</th>
+                    <th>Fecha Sol.</th>
+                    <th>Prioridad / Días</th>
+                    <th>Producto</th>
+                    <th>Cant</th>
+                    <th>Und</th>
+                    <th>Uso / Destino</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for i in items %}
+                <tr>
+                    <!-- Badge de estado -->
+                    <td>
+                        <span style="font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 12px; font-weight: bold;
+                            {% if i.status == 'PENDIENTE_JEFE' %} background: #d9f99d; color: #3f6212;
+                            {% elif i.status == 'COTIZACION' %} background: #bfdbfe; color: #1e40af;
+                            {% elif i.status == 'PENDIENTE_GT' %} background: #fef08a; color: #854d0e;                            
+                            {% elif i.status == 'PENDIENTE_GR' %} background: #fbcfe8; color: #9d174d;
+                            {% elif i.status == 'COMPRA_EN_CURSO' %} background: #e9d5ff; color: #6b21a8;
+                            {% elif i.status == 'TRANSITO' %} background: #fed7aa; color: #c2410c;
+                            {% elif i.status == 'RECIBIDO' %} background: #bbf7d0; color: #166534;
+                            {% elif i.status == 'RECHAZADO' %} background: #fecaca; color: #991b1b;
+                            {% endif %}
+                        ">
+                            {{ i.status|replace('_', ' ') }}
+                        </span>
+                    </td>
+                    <td><strong>{{ i.consecutive_no }}</strong></td>
+                    <td><small>{{ i.date }}</small></td>
+                    <td>
+                        <span
+                            style="font-size: 0.75rem; padding: 0.1rem 0.3rem; border-radius: 4px; font-weight: bold; background: {% if i.priority == 'Alta' %}#fecaca; color: #991b1b;{% elif i.priority == 'Media' %}#fef08a; color: #854d0e;{% else %}#bbf7d0; color: #166534;{% endif %}">{{
+                            i.priority }}</span><br>
+                        <small style="color: #666; font-weight: bold;">{{ i.days_elapsed }} días</small>
+                    </td>
+                    <td>{{ i.product_code }} - {{ i.description }}</td>
+                    <td>{{ i.quantity }}</td>
+                    <td>{{ i.unit_of_measure }}</td>
+                    <td><small style="color: #444; max-width: 150px; display: inline-block; white-space: normal;">{{
+                            i.destination }}</small></td>
+                    <td>
+                        <!-- JEFE AREA Approval -->
+                        {% if session.get('role') in ['JEFE_AREA', 'ADMIN'] and i.status == 'PENDIENTE_JEFE' %}
+                        <form method="POST" action="{{ url_for('maintenance.update_item', item_id=i.id) }}"
+                            style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="hidden" name="decision_jefe" id="val_jefe_{{i.id}}" value="">
+                            <textarea name="obs_jefe" class="form-control" placeholder="Observaciones Jefe" required
+                                style="padding: 0.4rem; min-width: 180px; min-height: 60px; resize: vertical;"></textarea>
+                            <button type="button" onclick="document.getElementById('val_jefe_{{i.id}}').value='SI'; this.form.submit();" class="btn btn-primary"
+                                style="padding: 0.3rem; background: var(--success); font-size: 0.8rem;">Aprobar</button>
+                            <button type="button" onclick="document.getElementById('val_jefe_{{i.id}}').value='NO'; this.form.submit();" class="btn btn-primary"
+                                style="padding: 0.3rem; background: var(--danger); font-size: 0.8rem;">Rechazar</button>
+                        </form>
+                        {% endif %}
+
+                        <!-- Compras: Add quotes OR add purchase -->
+                        {% if session.get('role') in ['COMPRAS', 'ADMIN'] %}
+                        {% if i.status == 'COTIZACION' %}
+                        <form method="POST" action="{{ url_for('maintenance.update_item', item_id=i.id) }}"
+                            style="display: flex; flex-direction: column; gap: 0.2rem; min-width: 300px;">
+                            <input type="hidden" name="action" value="COTIZAR">
+                            <small>Prov 1: <input type="text" name="c1p" value="{{ i.prov1 or '' }}"
+                                    list="suppliers-list"> Val: <input type="number" step="0.01" class="v-unit"
+                                    data-target="c1t_{{ i.id }}" data-qty="{{ i.quantity }}" name="c1v"
+                                    value="{{ i.v_unit1 or '' }}"> Tot: <input type="number" step="0.01" name="c1t"
+                                    id="c1t_{{ i.id }}" value="{{ i.v_tot1 or '' }}" readonly
+                                    style="background:#eee;"></small>
+                            <small>Prov 2: <input type="text" name="c2p" value="{{ i.prov2 or '' }}"
+                                    list="suppliers-list"> Val: <input type="number" step="0.01" class="v-unit"
+                                    data-target="c2t_{{ i.id }}" data-qty="{{ i.quantity }}" name="c2v"
+                                    value="{{ i.v_unit2 or '' }}"> Tot: <input type="number" step="0.01" name="c2t"
+                                    id="c2t_{{ i.id }}" value="{{ i.v_tot2 or '' }}" readonly
+                                    style="background:#eee;"></small>
+                            <small>Prov 3: <input type="text" name="c3p" value="{{ i.prov3 or '' }}"
+                                    list="suppliers-list"> Val: <input type="number" step="0.01" class="v-unit"
+                                    data-target="c3t_{{ i.id }}" data-qty="{{ i.quantity }}" name="c3v"
+                                    value="{{ i.v_unit3 or '' }}"> Tot: <input type="number" step="0.01" name="c3t"
+                                    id="c3t_{{ i.id }}" value="{{ i.v_tot3 or '' }}" readonly
+                                    style="background:#eee;"></small>
+                            <button type="submit" class="btn btn-primary"
+                                style="padding: 0.3rem; font-size: 0.8rem;">Enviar a GT</button>
+                        </form>
+                        {% elif i.status == 'COMPRA_EN_CURSO' %}
+                        <div style="font-size: 0.8rem; margin-bottom: 0.5rem; color: #555;">
+                            1. {{ i.prov1 }} (${{ i.v_tot1 }}) |
+                            2. {{ i.prov2 }} (${{ i.v_tot2 }}) |
+                            3. {{ i.prov3 }} (${{ i.v_tot3 }})
+                        </div>
+                        <form method="POST" action="{{ url_for('maintenance.update_item', item_id=i.id) }}"
+                            style="display: flex; flex-direction: column; gap: 0.2rem;">
+                            <input type="hidden" name="action" value="COMPRAR">
+                            <input type="date" name="fecha_compra" required class="form-control"
+                                style="padding: 0.2rem;">
+                            <input type="text" name="prov_compra" placeholder="Proveedor final" required
+                                class="form-control" style="padding: 0.2rem;" list="suppliers-list">
+                            <input type="text" name="orden_compra" placeholder="OC #" required class="form-control"
+                                style="padding: 0.2rem;">
+                            <button type="submit" class="btn btn-primary" style="padding: 0.3rem;">Marcar en
+                                Tránsito</button>
+                        </form>
+                        {% endif %}
+                        {% endif %}
+
+                        <!-- GT Approval -->
+                        {% if session.get('role') in ['GT', 'ADMIN'] and i.status == 'PENDIENTE_GT' %}
+                        <div style="font-size: 0.8rem; margin-bottom: 0.5rem; color: #555;">
+                            1. {{ i.prov1 }} (${{ i.v_unit1 }} c/u | Tot: ${{ i.v_tot1 }}) | 2. {{ i.prov2 }} (${{ i.v_unit2 }} c/u | Tot: ${{ i.v_tot2 }}) | 3. {{ i.prov3 }} (${{ i.v_unit3 }} c/u | Tot: ${{ i.v_tot3 }})
+                        </div>
+                        <form method="POST" action="{{ url_for('maintenance.update_item', item_id=i.id) }}"
+                            style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="hidden" name="decision_gt" id="val_gt_{{i.id}}" value="">
+                            <textarea name="obs_gt" class="form-control"
+                                style="padding: 0.3rem; min-width: 250px; min-height: 60px; resize: vertical;"
+                                placeholder="Observaciones GT" required></textarea>
+                            <button type="button" onclick="document.getElementById('val_gt_{{i.id}}').value='SI'; this.form.submit();" class="btn btn-primary"
+                                style="padding: 0.3rem; background: var(--success); font-size: 0.8rem;">Aprobar</button>
+                            <button type="button" onclick="document.getElementById('val_gt_{{i.id}}').value='NO'; this.form.submit();" class="btn btn-primary"
+                                style="padding: 0.3rem; background: var(--danger); font-size: 0.8rem;">Rechazar</button>
+                        </form>
+                        {% endif %}
+
+                        <!-- GR Approval -->
+                        {% if session.get('role') in ['GR', 'ADMIN'] %}
+                        {% if i.status == 'PENDIENTE_GR' %}
+                        <div style="font-size: 0.8rem; margin-bottom: 0.5rem; color: #555;">
+                            1. {{ i.prov1 }} (${{ i.v_unit1 }} c/u | Tot: ${{ i.v_tot1 }}) | 2. {{ i.prov2 }} (${{ i.v_unit2 }} c/u | Tot: ${{ i.v_tot2 }}) | 3. {{ i.prov3 }} (${{ i.v_unit3 }} c/u | Tot: ${{ i.v_tot3 }})
+                        </div>
+                        <form method="POST" action="{{ url_for('maintenance.update_item', item_id=i.id) }}"
+                            style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="hidden" name="decision_gr" id="val_gr_{{i.id}}" value="">
+                            <textarea name="obs_gr" class="form-control" placeholder="Observaciones GR" required
+                                style="padding: 0.4rem; min-width: 200px; width: 100%; min-height: 60px; resize: vertical;"></textarea>
+                            <button type="button" onclick="document.getElementById('val_gr_{{i.id}}').value='SI'; this.form.submit();" class="btn btn-primary"
+                                style="padding: 0.3rem; background: var(--success); font-size: 0.8rem;">Aprobar</button>
+                            <button type="button" onclick="document.getElementById('val_gr_{{i.id}}').value='NO'; this.form.submit();" class="btn btn-primary"
+                                style="padding: 0.3rem; background: var(--danger); font-size: 0.8rem;">Rechazar</button>
+                        </form>
+                        {% endif %}
+                        {% endif %}
+
+                        <!-- Warehouse Reception -->
+                        {% if session.get('role') in ['ALMACEN', 'ADMIN'] and i.status == 'TRANSITO' %}
+                        <form method="POST" action="{{ url_for('maintenance.update_item', item_id=i.id) }}"
+                            style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                            <input type="date" name="fecha_llegada" class="form-control" style="padding: 0.3rem;"
+                                required value="{{ today }}">
+                            <input type="number" name="cant_llegada" class="form-control"
+                                placeholder="Cant Llegó" required style="width: 100px; padding: 0.3rem;">
+                            <textarea name="obs_recepcion" class="form-control" placeholder="Observaciones de Recepción"
+                                style="padding: 0.3rem; min-width: 200px; min-height: 40px; resize: vertical;"></textarea>
+                            <button type="submit" class="btn btn-primary" style="padding: 0.3rem;">Guardar</button>
+                        </form>
+                        {% endif %}
+
+                        <!-- ReadOnly visibility of quotes for GT / GR -->
+                        {% if session.get('role') in ['JEFE_AREA', 'GT', 'GR', 'ADMIN', 'READ'] and i.status not in
+                        ['PENDIENTE_JEFE'] %}
+                        <div
+                            style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-muted); background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 6px;">
+                            {% if i.aprobado_jefe is not none %}<strong>Aprobado Jefe:</strong> {{ 'Sí' if
+                            i.aprobado_jefe else 'No/Pte' }} ({{ i.observaciones_jefe or '-' }})<br>{% endif %}
+                            {% if i.prov1 %}<strong>Cotizaciones:</strong><br> - {{ i.prov1 }} (${{ i.v_unit1 }} c/u | Tot: ${{ i.v_tot1 }}) <br> -
+                            {{ i.prov2 }} (${{ i.v_unit2 }} c/u | Tot: ${{ i.v_tot2 }}) <br> - {{ i.prov3 }} (${{ i.v_unit3 }} c/u | Tot: ${{ i.v_tot3 }})<br>{% endif %}
+                            <strong>Aprobado GT:</strong> {{ 'Sí' if i.aprobado_gt else 'No/Pte' }} ({{
+                            i.observaciones_gt or '-' }})<br>
+                            {% if i.aprobado_gr is not none %}<strong>Aprobado GR:</strong> {{ 'Sí' if i.aprobado_gr
+                            else 'No' }} ({{ i.observaciones_gr or '-' }})<br>{% endif %}
+                            {% if i.prov_compra %}<strong>Compra:</strong> Prov. Final {{ i.prov_compra }} | OC #{{
+                            i.orden_compra }} | Fecha: {{ i.fecha_compra }}<br>{% endif %}
+                            {% if i.fecha_llegada %}<strong>Recepción:</strong> {{ i.cant_llegada }} el {{
+                            i.fecha_llegada }}{% endif %}
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="text-align: center;">No hay ítems registrados o no tienes pendientes en tu
+                        buzón.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<script>
+    // Inicializar lista de proveedores
+    fetch('{{ url_for('suppliers.api_suppliers') }}')
+        .then(res => res.json())
+        .then(data => {
+            const dl = document.getElementById('suppliers-list');
+            data.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.name; // name will be shown and saved into db
+                // Note: the backend handles missing or free-text names fine.
+                dl.appendChild(opt);
+            });
+        });
+
+    // Calcular totales automáticamente
+    document.addEventListener('input', function (e) {
+        if (e.target.classList.contains('v-unit')) {
+            const qty = parseFloat(e.target.getAttribute('data-qty')) || 0;
+            const val = parseFloat(e.target.value) || 0;
+            const targetId = e.target.getAttribute('data-target');
+            const targetEl = document.getElementById(targetId);
+            if (targetEl) {
+                targetEl.value = (qty * val).toFixed(2);
+            }
+        }
+    });
+
+    // Real-time polling
+    let currentHash = null;
+    setInterval(() => {
+        fetch('{{ url_for('reports.dashboard_hash') }}')
+            .then(res => res.text())
+            .then(hash => {
+                if (!currentHash) {
+                    currentHash = hash;
+                } else if (currentHash !== hash) {
+                    // Check if user is typing
+                    const activeEl = document.activeElement;
+                    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+                        document.getElementById('update-toast').style.display = 'block';
+                    } else {
+                        window.location.reload();
+                    }
+                }
+            });
+    }, 5000); // Poll every 5 seconds
+</script>
+{% endblock %}
